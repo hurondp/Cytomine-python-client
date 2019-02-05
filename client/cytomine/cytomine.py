@@ -51,10 +51,7 @@ class Cytomine(object):
 
     def __init__(self, host, public_key, private_key, working_path="/tmp", protocol="http://", base_path="/api/",
                  verbose=False, timeout=120):
-        self.__protocol = protocol
-        host = host.replace("http://" , "")
-        host = host.replace("https://" , "")
-        self.__host = host
+        self.__host, self.__protocol = self._parse_url(host, protocol)
         self.__timeout = timeout
         self.__base_path = base_path
         self.__public_key = public_key
@@ -65,12 +62,31 @@ class Cytomine(object):
         self.__headers = None
         self.__verbose = verbose
 
+    @staticmethod
+    def _parse_url(host, provided_protocol):
+        protocol = "http" # default protocol
+
+        if host.startswith("http://"):
+            protocol = "http"
+        elif host.startswith("https://"):
+            protocol = "https"
+        elif provided_protocol is not None:
+            provided_protocol = provided_protocol.replace("://", "")
+            if provided_protocol in ("http", "https"):
+                protocol = provided_protocol
+
+        host = host.replace("http://", "").replace("https://", "")
+        return host, protocol
+
     # http://code.google.com/apis/storage/docs/reference/v1/developer-guidev1.html#authentication
     def __authorize(self, action, url="", content_type="", accept="application/json,*/*", sign_with_base_path = True):
         #sometimes url fetched are complete url, we have to remove  host and base_path in order to sign
         url = url.replace("http://%s%s" % (self.__host, self.__base_path), "")
         url = url.replace("https://%s%s" % (self.__host, self.__base_path), "")
-        self.__conn = httplib.HTTPConnection(self.__host, timeout=self.__timeout)
+        if self.__protocol == "https":
+            self.__conn = httplib.HTTPSConnection(self.__host, timeout=self.__timeout)
+        else:
+            self.__conn = httplib.HTTPConnection(self.__host, timeout=self.__timeout)
         locale.setlocale(locale.LC_TIME)
         self.__headers = {'accept': accept, 'date': strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()),
                           'X-Requested-With': 'XMLHttpRequest'}
